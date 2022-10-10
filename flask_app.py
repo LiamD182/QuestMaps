@@ -153,7 +153,9 @@ def map():
       marker=folium.vector_layers.CircleMarker()
       ).add_to(folium_map)
     folium_map.fit_bounds(folium_map.get_bounds(), padding=(30, 30))
-    return folium_map._repr_html_()
+    #return folium_map._repr_html_()
+    return render_template('map.html', quest_map = folium_map._repr_html_() )
+
 
 @app.route("/quest/<int:id>/map")
 def quest_map(id):
@@ -169,7 +171,7 @@ def quest_map(id):
         labels=False, ),
       ).add_to(folium_map)
     folium_map.fit_bounds(folium_map.get_bounds(), padding=(30, 30))
-    return folium_map._repr_html_()   
+    return render_template('quest_map.html', quest_map = folium_map._repr_html_(), quest_name=quest.quest_name )
 
 @app.route('/about/')
 def about():
