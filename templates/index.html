@@ -74,7 +74,14 @@
       <h1>Quest Maps</h1>
       <p>Hello and welcome to quest maps.</p>
       <hr>
-      <h3>Contacts</h3>
+      <h2>Most popular Quests</h2>
+      <ol>
+      {% for quest in quests %}
+                  <li><a href = "/quest/{{ quest.id }}/map">{{ quest.quest_name }}</a></li>
+            {% endfor %}
+          </ol>
+         <hr> 
+          <h3>Contacts</h3>
       <p>If you have feedback or you want to complain, then please contact me at my email adress below.</p>
       <p>Email Address - 16dalel@utcsheffield.org.uk</p>
       <p></p>
