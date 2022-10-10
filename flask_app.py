@@ -1,6 +1,9 @@
 from pytz import country_names
 from flask import Flask, request, flash, url_for, redirect, render_template
 from flask_sqlalchemy import SQLAlchemy 
+import geojson
+from sqlalchemy import lateral
+
 #https://flask-sqlalchemy.palletsprojects.com/en/2.x/quickstart/
 
 app = Flask(__name__)
@@ -13,11 +16,21 @@ import folium
 
 db = SQLAlchemy(app)
 
+class UserQuest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.ForeignKey("user.id")) 
+    quest_id = db.Column(db.ForeignKey("quest.id"))
+    quest = db.relationship("Quest") #, back_populates="users")
+    #user = db.relationship("User", back_populates="quests")
+    #locations = db.relationship("UserQuestLocation", back_populates="userquest")
+
+
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key = True)
     name = db.Column(db.String(100))
     email = db.Column(db.String(60))
-    quests = db.relationship("UserQuest", back_populates="quest")
+    quests = db.relationship("UserQuest") #, back_populates="quest")
 
     def __init__(self, name, email):
         self.name = name
@@ -29,14 +42,25 @@ class Quest(db.Model):
     id = db.Column(db.Integer, primary_key = True)
     author = db.Column(db.String(100))
     quest_name = db.Column(db.String(100))
-    locations = db.relationship("Location")
-    users = db.relationship("UserQuest", back_populates="quest")
+    locations = db.relationship("Location", lazy="joined")
+    #users = db.relationship("UserQuest", back_populates="quest")
 
 
     def __init__(self, author, quest_name):
         self.author = author
         self.quest_name = quest_name
 
+    def get_GeoJson(self):
+
+        print(self.locations[0])
+        #fList = list(map(Location.get_GeoJson,self.locations))
+        fList = []
+        for location in self.locations:
+            fList.append(location.get_GeoJson())
+
+        feature_collection = geojson.FeatureCollection(fList)
+        dump = geojson.dumps(feature_collection, sort_keys=True)
+        return dump
 
 #change the erd so its locations and a many-to-many with quest
 
@@ -50,34 +74,35 @@ class Location(db.Model):
     location_name = db.Column(db.String(100))
     latitude = db.Column(db.Float(100))
     longitude = db.Column(db.Float(100))
-    county = db.Column(db.String(100))
-    country = db.Column(db.String(100))
-    userquests = db.relationship("UserQuest", back_populates ="location")
+    description = db.Column(db.String())
+    
+
+    #userquests = db.relationship("UserQuest", back_populates ="location")
+
+    def get_GeoJson(self):
+        feature = geojson.Feature(geometry=geojson.Point((self.longitude, self.latitude)))
+        print (feature)
+        return feature
 
 
     
 
 
-    def __init__(self,location_name,latitude,longitude,county,country):
+    def __init__(self,location_name,latitude,longitude,description,quest):
         self.location_name = location_name
         self.latitude = latitude
         self.longitude = longitude 
-        self.county = county
-        self.country = country
-
-
-
-class UserQuest(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.ForeignKey("user.id")) 
-    quest_id = db.Column(db.ForeignKey("quest.id"))
-    user = db.relationship("User", back_populates="quests")
-    quest = db.relationship("Quest", back_populates="users")
-    locations = db.relationship("UserQuestLocation", back_populates="userquest")
+        self.description = description
+        self.quest = quest
+        
 
 
 
 
+
+
+
+'''
 class UserQuestLocation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     userquest_id = db.Column(db.ForeignKey("user_quest.id"))
@@ -90,7 +115,7 @@ class UserQuestLocation(db.Model):
     def __init__(self,completion_date, notes):
         self.completion_date = completion_date
         self.notes = notes
-
+'''
 
 #class students(db.Model):
 #    id = db.Column('quest_id', db.Integer, primary_key = True)
@@ -110,7 +135,28 @@ def index():
 def map():
     start_coords = (46.9540700, 142.7360300)
     folium_map = folium.Map(location=start_coords, zoom_start=14)
+    gj = folium.GeoJson(
+      "UNESCO.geojson", 
+      name="UNESCO World Hertitage Sites in UK",
+      #marker=folium.map.Marker(),
+      marker=folium.vector_layers.CircleMarker()
+      ).add_to(folium_map)
+    folium_map.fit_bounds(folium_map.get_bounds(), padding=(30, 30))
     return folium_map._repr_html_()
+
+@app.route("/quest/<int:id>/map")
+def quest_map(id):
+    quest = db.session.query(Quest).get_or_404(id)
+    start_coords = (46.9540700, 142.7360300)
+    folium_map = folium.Map(location=start_coords, zoom_start=14)
+    gj = folium.GeoJson(
+      quest.get_GeoJson(), 
+      name= quest.quest_name,
+      #marker=folium.map.Marker(),
+      marker=folium.vector_layers.CircleMarker()
+      ).add_to(folium_map)
+    folium_map.fit_bounds(folium_map.get_bounds(), padding=(30, 30))
+    return folium_map._repr_html_()   
 
 @app.route('/about/')
 def about():
@@ -124,10 +170,31 @@ def settings():
 @app.route('/start')
 def start():
     db.create_all()
-    new_quest = Quest(author ='Liam', quest_name = 'UNESCO')
-    db.session.add(new_quest)
-    db.session.commit()
+    quest = db.session.query(Quest).get(1)
+    if not quest:    
+        quest = Quest(author ='Liam', quest_name = 'UNESCO')
+        db.session.add(quest)
+    
+    location = db.session.query(Location).get(1)
+    if not location:
+        location = Location(quest = quest,location_name = 'Durham Castle',latitude = 54.774, longitude = -1.575, description = 'Durham Castle and Cathedral')
 
+        location = Location(quest = quest,location_name = 'Forth Bridge',latitude = 56.000421, longitude = -3.388726, description = 'A bridge')
+        db.session.add(location)
+
+#{"type":"Feature","geometry":{"type":"Point","coordinates":[-3.388726,56.000421,0]},"properties":{"name":"Forth Bridge","status":"Visited","description":"<br>Source: Wikipedia article <a href=\"https://en.wikipedia.org/wiki/List_of_World_Heritage_Sites_in_the_United_Kingdom#cite_ref-Lake_30-2\">List of World Heritage Sites in the United Kingdom</a>"}},
+
+
+    user = db.session.query(User).get(1)
+    if not user:
+        user = User(name = 'Liam', email = '16dalel@utcsheffield.org.uk')
+        db.session.add(user)
+
+
+
+
+    db.session.commit()
+    return render_template('about.html')
 '''
 @app.route('/db')
 def show_all():
