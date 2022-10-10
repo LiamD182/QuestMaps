@@ -62,6 +62,19 @@ class Quest(db.Model):
         dump = geojson.dumps(feature_collection, sort_keys=True)
         return dump
 
+    def createLocations(self, FC):
+        for feature in FC.features:
+            #print(feature)
+
+            location = Location(
+                quest = self,
+                location_name = feature.properties["name"],
+                latitude = feature.geometry.coordinates[1],
+                longitude = feature.geometry.coordinates[0],
+                description = feature.properties["description"])
+
+
+
 #change the erd so its locations and a many-to-many with quest
 
 
@@ -81,12 +94,7 @@ class Location(db.Model):
 
     def get_GeoJson(self):
         feature = geojson.Feature(geometry=geojson.Point((self.longitude, self.latitude)))
-        print (feature)
         return feature
-
-
-    
-
 
     def __init__(self,location_name,latitude,longitude,description,quest):
         self.location_name = location_name
@@ -175,14 +183,19 @@ def start():
         quest = Quest(author ='Liam', quest_name = 'UNESCO')
         db.session.add(quest)
     
+
     location = db.session.query(Location).get(1)
     if not location:
+        with open("./UNESCO.geojson", "r") as UNESCO :
+            FC = geojson.load(UNESCO)
+            quest.createLocations(FC)
+        '''
         location = Location(quest = quest,location_name = 'Durham Castle',latitude = 54.774, longitude = -1.575, description = 'Durham Castle and Cathedral')
 
         location = Location(quest = quest,location_name = 'Forth Bridge',latitude = 56.000421, longitude = -3.388726, description = 'A bridge')
-        db.session.add(location)
+        '''
+        #db.session.add(location)
 
-#{"type":"Feature","geometry":{"type":"Point","coordinates":[-3.388726,56.000421,0]},"properties":{"name":"Forth Bridge","status":"Visited","description":"<br>Source: Wikipedia article <a href=\"https://en.wikipedia.org/wiki/List_of_World_Heritage_Sites_in_the_United_Kingdom#cite_ref-Lake_30-2\">List of World Heritage Sites in the United Kingdom</a>"}},
 
 
     user = db.session.query(User).get(1)
