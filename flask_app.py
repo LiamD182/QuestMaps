@@ -93,8 +93,10 @@ class Location(db.Model):
     #userquests = db.relationship("UserQuest", back_populates ="location")
 
     def get_GeoJson(self):
-        feature = geojson.Feature(geometry=geojson.Point((self.longitude, self.latitude)))
+        feature = geojson.Feature(geometry=geojson.Point((self.longitude, self.latitude)),
+        properties= {"name":self.location_name,"description":self.description})
         return feature
+
 
     def __init__(self,location_name,latitude,longitude,description,quest):
         self.location_name = location_name
@@ -160,8 +162,10 @@ def quest_map(id):
     gj = folium.GeoJson(
       quest.get_GeoJson(), 
       name= quest.quest_name,
-      #marker=folium.map.Marker(),
-      marker=folium.vector_layers.CircleMarker()
+      marker=folium.map.Marker(),
+      #marker=folium.vector_layers.CircleMarker(),
+      tooltip=folium.GeoJsonTooltip(fields=['name'],
+        labels=False, ),
       ).add_to(folium_map)
     folium_map.fit_bounds(folium_map.get_bounds(), padding=(30, 30))
     return folium_map._repr_html_()   
