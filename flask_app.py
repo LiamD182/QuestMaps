@@ -3,6 +3,8 @@ from flask import Flask, request, flash, url_for, redirect, render_template
 from flask_sqlalchemy import SQLAlchemy 
 import geojson
 from sqlalchemy import lateral
+from flask_admin import Admin
+from flask_admin.contrib.sqla import ModelView
 
 #https://flask-sqlalchemy.palletsprojects.com/en/2.x/quickstart/
 
@@ -130,7 +132,13 @@ class UserQuestLocation(db.Model):
 #class students(db.Model):
 #    id = db.Column('quest_id', db.Integer, primary_key = True)
 
-
+app.config['FLASK_ADMIN_SWATCH'] = 'cerulean'
+admin = Admin(app, name='QuestMaps', template_mode='bootstrap3')
+admin.add_view(ModelView(User, db.session))
+admin.add_view(ModelView(Quest, db.session))
+admin.add_view(ModelView(UserQuest, db.session))
+admin.add_view(ModelView(Location, db.session))
+    
 
 
 
@@ -173,11 +181,11 @@ def quest_map(id):
     folium_map.fit_bounds(folium_map.get_bounds(), padding=(30, 30))
     return render_template('quest_map.html', quest_map = folium_map._repr_html_(), quest_name=quest.quest_name )
 
-@app.route('/about/')
+@app.route('/about/') # routes "/about" to the html page "about.html"
 def about():
-    return render_template('about.html')
+    return render_template('about.html') 
 
-@app.route('/settings/')
+@app.route('/settings/')# routes "/settings" to the html page "settings.html"
 def settings():
     return render_template('settings.html')
 
