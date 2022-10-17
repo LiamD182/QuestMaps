@@ -26,22 +26,30 @@ class UserQuest(db.Model):
     #user = db.relationship("User", back_populates="quests")
     locations = db.relationship("UserQuestLocation")#, back_populates="userquest")
 
-    def get_GeoJson(self, Visited = False):
+    def get_GeoJson(self, Status = 'Unvisited'):
 
         print(self.locations[0])
         #fList = list(map(Location.get_GeoJson,self.locations))
         fList = []
-        if Visited:
+        if Status == 'Visited':
             for location in self.locations:
-                fList.append(location.location.get_GeoJson())
+                if location.completion_date:
+                    fList.append(location.location.get_GeoJson())
         
-        else:
+        if Status == 'Unvisited':
             for location in self.quest.locations:
                 fList.append(location.get_GeoJson())
 
-        feature_collection = geojson.FeatureCollection(fList)
-        dump = geojson.dumps(feature_collection, sort_keys=True)
-        return dump
+        if Status == 'In progress':
+            for location in self.locations:
+                if not location.completion_date:
+                    fList.append(location.location.get_GeoJson())
+        if len(fList):
+
+            feature_collection = geojson.FeatureCollection(fList)
+            dump = geojson.dumps(feature_collection, sort_keys=True)
+            return dump
+        return None
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key = True)
@@ -179,22 +187,39 @@ def user_quest_map(id):
     userquest = db.session.query(UserQuest).get_or_404(id)
     start_coords = (46.9540700, 142.7360300)
     folium_map = folium.Map(location=start_coords, zoom_start=14)
-    gj = folium.GeoJson(
-      userquest.get_GeoJson(), 
-      name= userquest.quest.quest_name,
-      marker=folium.map.Marker(),
-      #marker=folium.vector_layers.CircleMarker(),
-      tooltip=folium.GeoJsonTooltip(fields=['name'],
-        labels=False, ),
-      ).add_to(folium_map)
+    gjGeo = userquest.get_GeoJson()
+    if(gjGeo): 
+        gj = folium.GeoJson(
+            gjGeo, 
+            name= userquest.quest.quest_name,
+            marker=folium.map.Marker(icon = folium.Icon(color='red')),
+            #marker=folium.vector_layers.CircleMarker(),
+            tooltip=folium.GeoJsonTooltip(fields=['name'],
+                labels=False, ),
+            ).add_to(folium_map)
 
-    gj_visited = folium.GeoJson(
-      userquest.get_GeoJson(True), 
-      name= userquest.quest.quest_name + " Visited",
-      marker=folium.vector_layers.CircleMarker(),
-      tooltip=folium.GeoJsonTooltip(fields=['name'],
-        labels=False, ),
-      ).add_to(folium_map)
+    gjGeo2 = userquest.get_GeoJson('Visited')
+    if(gjGeo2): 
+        gj_visited = folium.GeoJson(
+            gjGeo2, 
+            name= userquest.quest.quest_name + " Visited",
+            marker=folium.map.Marker(icon = folium.Icon(color = 'green', icon = 'check')),
+            #marker=folium.vector_layers.CircleMarker(icon = folium.Icon(color = 'green')),
+            tooltip=folium.GeoJsonTooltip(fields=['name'],
+                labels=False, ),
+            ).add_to(folium_map)
+
+
+    gjGeo3 = userquest.get_GeoJson('In progress')
+    if(gjGeo3): 
+        gj_in_progress = folium.GeoJson(
+            gjGeo3, 
+            name= userquest.quest.quest_name + " In progress",
+            marker=folium.map.Marker(icon = folium.Icon(color = 'orange')),
+            #marker=folium.vector_layers.CircleMarker(icon = folium.Icon(color = 'orange')),
+            tooltip=folium.GeoJsonTooltip(fields=['name'],
+                labels=False, ),
+            ).add_to(folium_map)
 
 
     folium_map.fit_bounds(folium_map.get_bounds(), padding=(30, 30))
