@@ -22,11 +22,26 @@ class UserQuest(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.ForeignKey("user.id")) 
     quest_id = db.Column(db.ForeignKey("quest.id"))
-    quest = db.relationship("Quest") #, back_populates="users")
+    quest = db.relationship("Quest")#, back_populates="users")
     #user = db.relationship("User", back_populates="quests")
-    #locations = db.relationship("UserQuestLocation", back_populates="userquest")
+    locations = db.relationship("UserQuestLocation")#, back_populates="userquest")
 
+    def get_GeoJson(self, Visited = False):
 
+        print(self.locations[0])
+        #fList = list(map(Location.get_GeoJson,self.locations))
+        fList = []
+        if Visited:
+            for location in self.locations:
+                fList.append(location.location.get_GeoJson())
+        
+        else:
+            for location in self.quest.locations:
+                fList.append(location.get_GeoJson())
+
+        feature_collection = geojson.FeatureCollection(fList)
+        dump = geojson.dumps(feature_collection, sort_keys=True)
+        return dump
 
 class User(db.Model):
     id = db.Column(db.Integer, primary_key = True)
@@ -63,6 +78,8 @@ class Quest(db.Model):
         feature_collection = geojson.FeatureCollection(fList)
         dump = geojson.dumps(feature_collection, sort_keys=True)
         return dump
+
+    
 
     def createLocations(self, FC):
         for feature in FC.features:
@@ -114,7 +131,7 @@ class Location(db.Model):
 
 
 
-'''
+
 class UserQuestLocation(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     userquest_id = db.Column(db.ForeignKey("user_quest.id"))
@@ -122,12 +139,12 @@ class UserQuestLocation(db.Model):
     completion_date = db.Column(db.DateTime())
     notes = db.Column(db.String())
     userquest = db.relationship("UserQuest", back_populates="locations")
-    location= db.relationship("Location", back_populates="userquests")
+    location= db.relationship("Location")# ,back_populates="userquests")
 
     def __init__(self,completion_date, notes):
         self.completion_date = completion_date
         self.notes = notes
-'''
+
 
 #class students(db.Model):
 #    id = db.Column('quest_id', db.Integer, primary_key = True)
@@ -138,6 +155,7 @@ admin.add_view(ModelView(User, db.session))
 admin.add_view(ModelView(Quest, db.session))
 admin.add_view(ModelView(UserQuest, db.session))
 admin.add_view(ModelView(Location, db.session))
+admin.add_view(ModelView(UserQuestLocation, db.session))
     
 
 
@@ -147,7 +165,40 @@ admin.add_view(ModelView(Location, db.session))
 def index():
     return render_template('index.html', quests = Quest.query.all() )
 
+# To do - add URLs "user/1/quest" and "user/1/quest/1/map"
 
+
+@app.route("/user/<int:id>/quests")
+def user_quest_list(id):
+    user = db.session.query(User).get_or_404(id)
+    return render_template('user_quest_list.html', user = user)
+
+
+@app.route("/userquest/<int:id>/map")
+def user_quest_map(id):
+    userquest = db.session.query(UserQuest).get_or_404(id)
+    start_coords = (46.9540700, 142.7360300)
+    folium_map = folium.Map(location=start_coords, zoom_start=14)
+    gj = folium.GeoJson(
+      userquest.get_GeoJson(), 
+      name= userquest.quest.quest_name,
+      marker=folium.map.Marker(),
+      #marker=folium.vector_layers.CircleMarker(),
+      tooltip=folium.GeoJsonTooltip(fields=['name'],
+        labels=False, ),
+      ).add_to(folium_map)
+
+    gj_visited = folium.GeoJson(
+      userquest.get_GeoJson(True), 
+      name= userquest.quest.quest_name + " Visited",
+      marker=folium.vector_layers.CircleMarker(),
+      tooltip=folium.GeoJsonTooltip(fields=['name'],
+        labels=False, ),
+      ).add_to(folium_map)
+
+
+    folium_map.fit_bounds(folium_map.get_bounds(), padding=(30, 30))
+    return render_template('quest_map.html', quest_map = folium_map._repr_html_(), quest_name=userquest.quest.quest_name )
 
 
 @app.route('/map')
