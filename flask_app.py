@@ -120,8 +120,13 @@ class Location(db.Model):
     #userquests = db.relationship("UserQuest", back_populates ="location")
 
     def get_GeoJson(self):
+        form = render_template('locationform.html',location=self )
         feature = geojson.Feature(geometry=geojson.Point((self.longitude, self.latitude)),
-        properties= {"name":self.location_name,"description":self.description})
+        properties= {
+            "name":self.location_name,
+            "description":self.description, 
+            "form":form
+            })
         return feature
 
 
@@ -196,6 +201,9 @@ def user_quest_map(id):
             #marker=folium.vector_layers.CircleMarker(),
             tooltip=folium.GeoJsonTooltip(fields=['name'],
                 labels=False, ),
+            popup =folium.GeoJsonPopup(fields=['name','description',"form"],
+                labels=False, ),
+                
             ).add_to(folium_map)
 
     gjGeo2 = userquest.get_GeoJson('Visited')
