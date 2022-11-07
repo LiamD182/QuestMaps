@@ -38,6 +38,7 @@ class UserQuest(db.Model):
         
         if Status == 'Unvisited':
             for location in self.quest.locations:
+                ## inject the userquest.id ????
                 fList.append(location.get_GeoJson())
 
         if Status == 'In progress':
@@ -187,8 +188,21 @@ def user_quest_list(id):
     return render_template('user_quest_list.html', user = user)
 
 
+@app.route("/userquest/<int:id>/location/<int:locationid>/create" , methods = ['POST'])
+def user_quest_location_create(id, locationid,):
+    userquest = db.session.query(UserQuest).get_or_404(id)
+
+    #check if userquest has location in   
+    #if if it does then throw error
+    # if not then create one from values in the form
+    #Then save it 
+    #redirect to the id
+    return redirect(url_for("user_quest_map", id=id, map_only = True))
+
 @app.route("/userquest/<int:id>/map")
 def user_quest_map(id):
+    map_only = request.args.get("map_only", False)
+        
     userquest = db.session.query(UserQuest).get_or_404(id)
     start_coords = (46.9540700, 142.7360300)
     folium_map = folium.Map(location=start_coords, zoom_start=14)
@@ -231,6 +245,11 @@ def user_quest_map(id):
 
 
     folium_map.fit_bounds(folium_map.get_bounds(), padding=(30, 30))
+    
+    print ("map_only" , map_only)
+    if map_only :
+        return  folium_map._repr_html_()
+
     return render_template('quest_map.html', quest_map = folium_map._repr_html_(), quest_name=userquest.quest.quest_name )
 
 
